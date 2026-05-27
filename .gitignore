@@ -1,0 +1,8 @@
+# --- Binary Executables ---
+lockbox
+lockbox.exe
+*.exe
+
+# --- Encrypted Vault State ---
+# Never let your real credentials touch GitHub!
+vault.lock
