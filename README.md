@@ -34,6 +34,14 @@ Update the password of an existing credential by its Index. Other fields remain 
 lockbox --edit '2:MyN3wP@ss!'
 ```
 
+### `--reorder 'old_index:new_index'`
+
+Move a credential's Index to a new position. Other credentials shift to fill the gap.
+
+```
+lockbox --reorder '3:1'
+```
+
 ### `--delete index`
 
 Delete a credential by its Index. Requires a positive integer.

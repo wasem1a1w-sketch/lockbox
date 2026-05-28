@@ -41,6 +41,44 @@ func (v *Vault) Delete(index int) error {
 	return fmt.Errorf("credential with index %d not found", index)
 }
 
+func (vault *Vault) ReOrder(old_index int, new_index int) error {
+	if old_index == new_index {
+		return nil
+	}
+	if old_index < 1 || new_index < 1 {
+		return fmt.Errorf("indices must be above zero")
+	}
+
+	pos := -1
+	for i, value := range *vault {
+		if value.Index == old_index {
+			pos = i
+			break
+		}
+	}
+	if pos == -1 {
+		return fmt.Errorf("credential with index %d not found", old_index)
+	}
+
+	(*vault)[pos].Index = new_index
+
+	if new_index < old_index {
+		for i, value := range *vault {
+			if i != pos && value.Index >= new_index && value.Index < old_index {
+				(*vault)[i].Index++
+			}
+		}
+	} else {
+		for i, value := range *vault {
+			if i != pos && value.Index > old_index && value.Index <= new_index {
+				(*vault)[i].Index--
+			}
+		}
+	}
+
+	return nil
+}
+
 func (v *Vault) EditPassword(index int, password string) error {
 	for i, c := range *v {
 		if c.Index == index {
