@@ -2,6 +2,28 @@
 
 A CLI password vault that stores credentials in an AES-256-GCM encrypted file on disk.
 
+## Installation
+
+### Prerequisites
+- **Go 1.21+** ([Download Go](https://go.dev/dl/))
+
+### Option 1: `go install` (Recommended)
+
+```bash
+go install github.com/wasem1a1w-sketch/lockbox@latest
+```
+
+### Option 2: Build from source
+
+```bash
+git clone https://github.com/wasem1a1w-sketch/lockbox.git
+cd lockbox
+# On Windows:
+go build -o lockbox.exe
+# On Mac/Linux:
+go build -o lockbox
+```
+
 ## How it works
 
 - Credentials are stored in `vault.lock` — an encrypted file using AES-256-GCM
