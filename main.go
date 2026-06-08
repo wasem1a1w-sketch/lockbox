@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"crypto/rand"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strconv"
@@ -17,6 +19,7 @@ func main() {
 	reorderCmd := flag.String("reorder", "", "Reorder a credential: 'old_index:new_index'")
 	deleteCmd := flag.Int("delete", -1, "Delete a credential by its index")
 	genCmd := flag.Int("gen", 0, "Generate a strong password of the specified length")
+	changeMasterPasswordCmd := flag.Bool("change-master-password", false, "Change the master password for the entire vault")
 	flag.Parse()
 
 	storage := NewSecureStorage("vault.lock")
@@ -46,8 +49,11 @@ func main() {
 	case *genCmd > 0:
 		handleGenerate(*genCmd)
 
+	case *changeMasterPasswordCmd:
+		handleChangeMasterPassword(&vault, storage, key, salt)
+
 	default:
-		fmt.Println("ℹ️ Action required. Pass a flag: --add, --list, --edit, --delete, or --gen")
+		fmt.Println("ℹ️ Action required. Pass a flag: --add, --list, --edit, --delete, --gen, or --change-master-password")
 	}
 }
 
@@ -189,4 +195,33 @@ func handleGenerate(length int) {
 		return
 	}
 	fmt.Printf("🔐 Generated Password: %s\n", password)
+}
+
+func handleChangeMasterPassword(vault *Vault, storage *SecureStorage, key, salt []byte) {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("🔑 Enter New Vault Master Password: ")
+	newPassword, _ := reader.ReadString('\n')
+	newPassword = strings.TrimSpace(newPassword)
+	if newPassword == "" {
+		fmt.Println("🚨 Error: Master password cannot be blank.")
+		return
+	}
+	fmt.Printf("🔑 Confirm New Vault Master Password: ")
+	confirmPassword, _ := reader.ReadString('\n')
+	confirmPassword = strings.TrimSpace(confirmPassword)
+	if newPassword != confirmPassword {
+		fmt.Println("🚨 Error: Passwords do not match.")
+		return
+	}
+	newSalt := make([]byte, 16)
+	if _, err := io.ReadFull(rand.Reader, newSalt); err != nil {
+		fmt.Printf("🚨 Failed to generate new salt: %v\n", err)
+		return
+	}
+	newKey := DeriveKey(newPassword, newSalt)
+	if err := storage.Save(*vault, newKey, newSalt); err != nil {
+		fmt.Printf("🚨 Failed to save vault with new password: %v\n", err)
+		return
+	}
+	fmt.Println("🔐 Master password changed successfully.")
 }
