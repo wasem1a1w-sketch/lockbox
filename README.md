@@ -80,6 +80,14 @@ Generate a cryptographically strong random password (upper/lower/digits/symbols)
 lockbox --gen 20
 ```
 
+### `--change-master-password`
+
+Change the master password for the entire vault. You will be prompted for the current password, then asked to enter and confirm a new one. The vault is re-encrypted with a fresh salt and a new key derived from the new password.
+
+```
+lockbox --change-master-password
+```
+
 ## File structure
 
 | File | Purpose |
