@@ -5,7 +5,7 @@ A CLI password vault that stores credentials in an AES-256-GCM encrypted file on
 ## Installation
 
 ### Prerequisites
-- **Go 1.21+** ([Download Go](https://go.dev/dl/))
+- **Go 1.22+** ([Download Go](https://go.dev/dl/))
 
 ### Option 1: `go install` (Recommended)
 
@@ -19,82 +19,156 @@ go install github.com/wasem1a1w-sketch/lockbox@latest
 git clone https://github.com/wasem1a1w-sketch/lockbox.git
 cd lockbox
 # On Windows:
-go build -o lockbox.exe
+go build -o lockbox.exe ./cmd/lockbox
 # On Mac/Linux:
-go build -o lockbox
+go build -o lockbox ./cmd/lockbox
 ```
 
 ## How it works
 
-- Credentials are stored in `vault.lock` — an encrypted file using AES-256-GCM
+- Credentials are stored in an encrypted file (default: `~/.local/share/lockbox/vault.lock`)
 - A master password derives the encryption key via PBKDF2 (100,000 SHA-256 iterations)
-- Each credential has a unique **Index** identifier for targeted edit/delete operations
+- Each credential has a unique **UUID** identifier for targeted edit/delete operations
 
 ## Commands
 
-### `--add 'domain:username:password'`
+### `add "domain:username:password"`
 
 Add a new credential.
 
-```
-lockbox --add 'example.com:alice:myP@ss!'
-```
-
-### `--list`
-
-Decrypt and display all stored credentials with their Index, account, username, password, and save date.
-
-```
-lockbox --list
+```bash
+lockbox add "example.com:alice:myP@ss!"
 ```
 
-### `--edit 'index:newpassword'`
+### `list`
 
-Update the password of an existing credential by its Index. Other fields remain unchanged.
+Decrypt and display all stored credentials with their ID, account, username, password, and save date. Passwords are hidden by default.
 
-```
-lockbox --edit '2:MyN3wP@ss!'
-```
-
-### `--reorder 'old_index:new_index'`
-
-Move a credential's Index to a new position. Other credentials shift to fill the gap.
-
-```
-lockbox --reorder '3:1'
+```bash
+lockbox list
+lockbox list --show-password
+lockbox list --search github
+lockbox list --user alice
 ```
 
-### `--delete index`
+### `edit "id_or_index:newpassword"`
 
-Delete a credential by its Index. Requires a positive integer.
+Update the password of an existing credential by its ID or display index.
 
-```
-lockbox --delete 2
-```
-
-### `--gen length`
-
-Generate a cryptographically strong random password (upper/lower/digits/symbols). Specify the desired length as an argument.
-
-```
-lockbox --gen 20
+```bash
+lockbox edit "2:MyN3wP@ss!"
+lockbox edit "a1b2c3d4:MyN3wP@ss!"
 ```
 
-### `--change-master-password`
+### `reorder "old_index:new_index"`
+
+Move a credential to a new display position. Other credentials shift to fill the gap.
+
+```bash
+lockbox reorder "3:1"
+```
+
+### `delete id_or_index`
+
+Delete a credential by its ID or display index.
+
+```bash
+lockbox delete 2
+lockbox delete "a1b2c3d4"
+```
+
+### `generate [length]`
+
+Generate a cryptographically strong random password (upper/lower/digits/symbols). Default length is 20.
+
+```bash
+lockbox generate 20
+```
+
+### `change-master`
 
 Change the master password for the entire vault. You will be prompted for the current password, then asked to enter and confirm a new one. The vault is re-encrypted with a fresh salt and a new key derived from the new password.
 
-```
-lockbox --change-master-password
+```bash
+lockbox change-master
 ```
 
-## File structure
+### `config`
 
-| File | Purpose |
-|---|---|
-| `main.go` | CLI entry point, flag parsing, command dispatch |
-| `vault.go` | Credential model and CRUD operations |
-| `password.go` | Random password generation |
-| `crypto.go` | PBKDF2 key derivation, AES-256-GCM encrypt/decrypt |
-| `storage.go` | Encrypted file persistence |
-| `vault.lock` | Encrypted vault data (gitignored) |
+Manage configuration settings.
+
+```bash
+lockbox config show
+lockbox config set vault_path ~/my-vault.lock
+lockbox config set kdf_iterations 100000
+lockbox config set default_gen_length 20
+```
+
+## Global Flags
+
+```bash
+--vault PATH        # Override vault file location
+--iterations N      # Override PBKDF2 iterations
+```
+
+## Configuration
+
+**Location:** `~/.config/lockbox/config.yaml`
+
+```yaml
+vault_path: "~/.local/share/lockbox/vault.lock"
+kdf_iterations: 100000
+default_gen_length: 20
+```
+
+**Environment variable overrides:**
+- `LOCKBOX_VAULT_PATH`
+- `LOCKBOX_KDF_ITERATIONS`
+- `LOCKBOX_DEFAULT_GEN_LENGTH`
+
+## Shell Completion
+
+```bash
+# Bash
+lockbox completion bash > /etc/bash_completion.d/lockbox
+
+# Zsh
+lockbox completion zsh > "${fpath[1]}/_lockbox"
+
+# Fish
+lockbox completion fish > ~/.config/fish/completions/lockbox.fish
+```
+
+## Security
+
+- **AES-256-GCM** authenticated encryption
+- **PBKDF2** key derivation with 100,000 iterations
+- Master password input is masked (not echoed to terminal)
+- File permissions: 0600 (vault), 0700 (directories)
+- Random salt per vault file
+
+## File Structure
+
+```
+lockbox/
+├── cmd/lockbox/          # CLI entry point and commands
+│   ├── main.go           # Entry point, password reading
+│   ├── root.go           # Root Cobra command, global flags
+│   ├── add.go            # Add credential
+│   ├── list.go           # List with search/filter
+│   ├── edit.go           # Edit password (by ID or index)
+│   ├── delete.go         # Delete (by ID or index)
+│   ├── generate.go       # Generate password
+│   ├── reorder.go        # Reorder display position
+│   ├── changemaster.go   # Change master password
+│   ├── config.go         # Config management
+│   └── vault.go          # Shared vault-unlocking helper
+├── internal/
+│   ├── vault/            # Credential model, CRUD, filtering
+│   ├── crypto/           # PBKDF2 key derivation, AES-256-GCM
+│   ├── storage/          # Encrypted file I/O
+│   └── config/           # Viper-based configuration
+├── go.mod
+├── CHANGELOG.md
+└── README.md
+```
