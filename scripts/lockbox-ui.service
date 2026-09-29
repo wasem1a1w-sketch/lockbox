@@ -1,0 +1,14 @@
+[Unit]
+Description=Lockbox local web UI (127.0.0.1:8787)
+Documentation=file:///var/www/html/lockbox/README.md
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=@BIN@ ui --no-open
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

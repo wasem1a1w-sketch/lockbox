@@ -2,6 +2,7 @@ package vault
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -57,6 +58,19 @@ func (v *Vault) DeleteByIndex(index int) error {
 func (v *Vault) EditPasswordByID(id, password string) error {
 	for i, c := range *v {
 		if c.ID == id {
+			(*v)[i].Password = password
+			(*v)[i].SavedAt = time.Now()
+			return nil
+		}
+	}
+	return fmt.Errorf("credential with id %s not found", id)
+}
+
+func (v *Vault) EditFields(id, account, username, password string) error {
+	for i, c := range *v {
+		if c.ID == id {
+			(*v)[i].Account = account
+			(*v)[i].Username = username
 			(*v)[i].Password = password
 			(*v)[i].SavedAt = time.Now()
 			return nil
@@ -135,4 +149,38 @@ func (v Vault) Filter(search, username string) Vault {
 
 func contains(s, substr string) bool {
 	return strings.Contains(s, substr)
+}
+
+// SortByOrder stably sorts the vault into display order.
+func (v Vault) SortByOrder() {
+	sort.SliceStable(v, func(i, j int) bool {
+		return v[i].SortOrder < v[j].SortOrder
+	})
+}
+
+// EnsureIDs assigns UUIDs to credentials loaded from legacy vaults
+// (pre-UUID format) and normalizes any missing SortOrder values.
+// Returns the number of changes made; 0 means nothing to persist.
+func (v Vault) EnsureIDs() int {
+	changed := 0
+	for i := range v {
+		if v[i].ID == "" {
+			v[i].ID = uuid.New().String()
+			changed++
+		}
+	}
+	hasZero := false
+	for i := range v {
+		if v[i].SortOrder == 0 {
+			hasZero = true
+			break
+		}
+	}
+	if hasZero {
+		for i := range v {
+			v[i].SortOrder = i + 1
+			changed++
+		}
+	}
+	return changed
 }

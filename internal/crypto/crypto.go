@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	KeySize   = 32
-	SaltSize  = 16
+	KeySize           = 32
+	SaltSize          = 16
 	DefaultIterations = 100000
 )
 

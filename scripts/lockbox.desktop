@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Lockbox
+GenericName=Password Manager
+Comment=Local encrypted password vault
+Exec=@HOME@/.local/bin/lockbox-web
+Icon=lockbox
+Terminal=false
+Categories=Utility;Security;
+Keywords=password;vault;secret;credentials;
+StartupNotify=true

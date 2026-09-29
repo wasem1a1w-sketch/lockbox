@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"lockbox/internal/crypto"
 	"lockbox/internal/vault"
@@ -118,4 +119,102 @@ func (s *SecureStorage) GetIterations() (int, error) {
 		return 100000, nil
 	}
 	return iterations, nil
+}
+
+// layout describes one known vault file format.
+// legacy: [16B salt][ciphertext]                     (pre-refactor CLI, fixed 100000 iterations)
+// current: [16B salt][4B iterations][ciphertext]
+type layout struct {
+	iterations int
+	ctOffset   int
+}
+
+// LoadWithPassword decrypts the vault, trying every known file layout until
+// one authenticates. GCM authentication guarantees no false positives.
+// Returns the vault and the iterations actually used, so a save rewrites
+// the file in the current format with a correct header.
+func (s *SecureStorage) LoadWithPassword(password string, explicitIterations int) (vault.Vault, int, error) {
+	fileBytes, err := os.ReadFile(s.FileName)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return vault.Vault{}, 0, nil
+		}
+		return nil, 0, err
+	}
+	if len(fileBytes) < crypto.SaltSize {
+		return nil, 0, errors.New("malformed or corrupted vault file")
+	}
+	salt := fileBytes[:crypto.SaltSize]
+
+	for _, l := range detectLayouts(fileBytes, explicitIterations) {
+		if l.ctOffset >= len(fileBytes) {
+			continue
+		}
+		key := crypto.DeriveKey(password, salt, l.iterations)
+		plaintext, err := crypto.Decrypt(fileBytes[l.ctOffset:], key)
+		if err != nil {
+			continue
+		}
+		v, err := decodeVault(plaintext)
+		if err != nil {
+			continue
+		}
+		return v, l.iterations, nil
+	}
+	return nil, 0, errors.New("access denied: incorrect master password")
+}
+
+// legacyCredential matches both current and pre-refactor JSON shapes.
+// The old CLI stored a positional `index` field that the current model
+// lacks; decodeVault maps it to SortOrder so display order survives.
+type legacyCredential struct {
+	ID        string    `json:"id"`
+	Index     int       `json:"index"`
+	Account   string    `json:"account"`
+	Username  string    `json:"username"`
+	Password  string    `json:"password"`
+	SavedAt   time.Time `json:"saved_at"`
+	SortOrder int       `json:"sort_order"`
+}
+
+func decodeVault(plaintext []byte) (vault.Vault, error) {
+	var raw []legacyCredential
+	if err := json.Unmarshal(plaintext, &raw); err != nil {
+		return nil, err
+	}
+	v := make(vault.Vault, len(raw))
+	for i, r := range raw {
+		sortOrder := r.SortOrder
+		if sortOrder == 0 && r.Index > 0 {
+			sortOrder = r.Index
+		}
+		v[i] = vault.Credential{
+			ID:        r.ID,
+			Account:   r.Account,
+			Username:  r.Username,
+			Password:  r.Password,
+			SavedAt:   r.SavedAt,
+			SortOrder: sortOrder,
+		}
+	}
+	return v, nil
+}
+
+func detectLayouts(fileBytes []byte, explicitIterations int) []layout {
+	if explicitIterations > 0 {
+		return []layout{
+			{explicitIterations, crypto.SaltSize + 4},
+			{explicitIterations, crypto.SaltSize},
+		}
+	}
+	var out []layout
+	if len(fileBytes) >= crypto.SaltSize+4 {
+		headerIterations := int(binary.BigEndian.Uint32(fileBytes[crypto.SaltSize : crypto.SaltSize+4]))
+		if headerIterations >= 1000 && headerIterations <= 10000000 {
+			out = append(out, layout{headerIterations, crypto.SaltSize + 4})
+		}
+	}
+	// Legacy CLI always derived with 100000 iterations.
+	out = append(out, layout{crypto.DefaultIterations, crypto.SaltSize})
+	return out
 }

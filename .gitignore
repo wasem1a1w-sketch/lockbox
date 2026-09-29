@@ -1,7 +1,13 @@
 # --- Binary Executables ---
-lockbox
-lockbox.exe
+/lockbox
+/lockbox.exe
 *.exe
 
 # --- Encrypted Vault State ---
 vault.lock
+
+# --- Web UI build artifacts ---
+ui/node_modules/
+ui/dist/
+internal/server/dist/index.html
+internal/server/dist/assets/
